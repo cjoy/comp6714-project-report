@@ -1,0 +1,69 @@
+\documentclass{article}
+\usepackage[margin=0.7in]{geometry}
+\usepackage[parfill]{parskip}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{tikz}
+\usepackage{mathtools}
+\DeclarePairedDelimiter\abs{\lvert}{\rvert}%
+\DeclarePairedDelimiter\norm{\lVert}{\rVert}%
+\makeatletter
+\let\oldabs\abs
+\def\abs{\@ifstar{\oldabs}{\oldabs*}}
+\let\oldnorm\norm
+\def\norm{\@ifstar{\oldnorm}{\oldnorm*}}
+\makeatother
+\newcommand{\p}{\\\\}
+
+\title{\textbf{COMP6714 Project Report}}
+\author{Oliver Dolk (z5115375) \and Chris Joy (z5113243)}
+\date{October 26th, 2018}
+
+\begin{document}
+
+\maketitle
+
+\section*{Task 1: evaluate()}
+For this task, we've written a function that computes the $F_1$ score given a list of predicted and golden tags (i.e. ground truth). The $F_1$ score is just the harmonic mean of the precision and recall.
+\subsection*{Implementation}
+Before computing values in the confusion matrix (i.e. true positives, false negatives and false positives), given the golden and predicted tags, we implemented a method that basically compressed these two lists. Compressing involved finding two adjacent non-"O" tags and combining them as one value in the sentence array. This makes it easier to compare values in both sentences for later comparison operations. \p
+The next step involved computing values in the confusion matrix. Three different functions were written to count the number of true positives, false positives and false negatives, given a golden and predicted tags list. A true positive ($T_P$) is when an observation appears in both the predicted and golden tags list. A false positive ($F_P$) is when an observation appears in the predicted tags list, but not in the golden tags list. Lastly, a false negative ($F_N$) is when an observation appears in the golden tags list, but not in the predicted tags list. We sum these values in the confusion matrix for every sentence in the predicted/golden tags list. \p
+Lastly, given the total number of true positives, false positives and false negatives, we needed to calculate the $F_1$ score. As stated above, the $F_1$ score is basically the harmonic mean of the precision and recall.
+\begin{align*}
+F_1 &= 2 \times \frac{Precision \times Recall}{Precision + Recall}
+\end{align*}
+The precision and recall are as follows.
+\begin{align*}
+Precision = \frac{T_P}{T_P + F_P}~~~~~~~
+Recall = \frac{T_P}{T_P + F_N}
+\end{align*}
+Substituting Precision and Recall into $F_1$, gives us the final scoring function:
+\begin{align*}
+F_1 &= \frac{2 \times T_P}{ 2 \cdot T_P + F_N + F_P}
+\end{align*}
+After summing up the total number of $T_P$, $F_P$ and $F_N$ observations from every sentence, we pass in these values into the scoring function defined above and return the resulting float as the final evaluation.
+\subsection*{Analysis}
+The modification doesn't actually improve the performance of our models, but rather allows us to keep the model with the best $F_1$ score. The resulting model saved in `data/result\_model.pt` is ideally the one we'd use in a production setting. Using the training dataset, we observed the best model on the 48th epoch (out of 50), with an $F_1$ score of 0.756. $F_1$ score is a much better score than accuracy in this context, in terms of performance metrics.
+
+\section*{Task 2: new\_LSTMCell()}
+For this task, we were required to implement a new version of the LSTM Cell with a slight modification in controlling the input gate.
+\subsection*{Implementation}
+Our implementation is based on the original implementation of the LSTM cell in pytorch's nn module (i.e. \\torch.nn.\_functions.rnn.LSTMCELL()). We only had to make a slight modification in the line 43 of the existing LSTM cell implementation,\\ from:
+\begin{align*}
+cy = (forgetgate \times cx) + (ingate \times cellgate)
+\end{align*}
+to:
+\begin{align*}
+cy = (forgetgate \times cx) + ((1-forgetgate) \times cellgate)
+\end{align*}
+This modification allows us to decide on what to forget and what we should add information to, all at once.
+\subsection*{Analysis}
+After this modification, we noticed a significant increase in training time, compared with when using the default LSTM cell. However, we observed an initial average decrease in loss by 13\% with a new model and a new best $F_1$ score of 0.759, compared to the previous score of 0.756 (0.3\% increase).
+
+\section*{Task 3: get\_char\_sequence()}
+For this task, we were required to implement a BiLSTM layer for Character embedding. The get char sequence task involved encoding characters with character embeddings and feeding them through an LSTM.
+\subsection*{Implementation}
+Our implementation closely followed what was expected. We first created mini batches using the torch view function. We then sorted the batches so that we could use the pack padded sequence function. They were then fed through the lstm. We collected the hidden states and concatenated the two layers. They were then unsorted and the resulting tensor was returned.
+\subsection*{Analysis}
+Before adding the Char BiLSTM layer, the maximum $F_1$ we observed within a total of 50 epochs was 0.756. Using this layer, without the new LSTM cell, resulted in a model with a new maximum $F_1$ score of 0.763. After adding this layer, along with using the new LSTM modification (from task 2), we were able to obtain a model with a new $F_1$ score of 0.762. This is an increase of 0.9\% from our base model, but a decrease of 0.1\% when compared to using the default LSTM cell implementation.
+\end{document}
